@@ -1,101 +1,57 @@
-# import pandas library
 import pandas as pd
-
-# Get the data
-column_names = ['user_id', 'item_id', 'rating', 'timestamp']
-
-path = r'C:\Users\theam\Downloads\file.tsv'
-
-df = pd.read_csv(path, sep='\t', names=column_names)
-
-# Check the head of the data
-print(df.head())
-
-# Check out all the movies and their respective IDs
-movie_titles = pd.read_csv(r'C:\Users\theam\Downloads\Movie_Id_Titles.csv')
-print(movie_titles.head())
-
-data = pd.merge(df, movie_titles, on='item_id')
-print(data.head())
-
-# Calculate mean rating of all movies
-print(data.groupby('title')['rating'].mean().sort_values(ascending=False).head())
-
-# Calculate count rating of all movies
-print(data.groupby('title')['rating'].count().sort_values(ascending=False).head())
-
-# creating dataframe with 'rating' count values
-ratings = pd.DataFrame(data.groupby('title')['rating'].mean())
-
-ratings['num of ratings'] = pd.DataFrame(data.groupby('title')['rating'].count())
-
-print(ratings.head())
-
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tkinter import Tk, Label, Entry, Button, Text, END
 
-sns.set_style('white')
-# plot graph of 'num of ratings column'
-plt.figure(figsize =(10, 4))
+# Data Preparation
+column_names = ['user_id', 'item_id', 'rating', 'timestamp']
+path = r'C:\Users\theam\Downloads\file.tsv'
+df = pd.read_csv(path, sep='\t', names=column_names)
 
-print(ratings['rating'].hist(bins = 70))
+movie_titles = pd.read_csv(r'C:\Users\theam\Downloads\Movie_Id_Titles.csv')
+data = pd.merge(df, movie_titles, on='item_id')
 
-# Sorting values according to
-# the 'num of rating column'
-moviemat = data.pivot_table(index ='user_id',
-			columns ='title', values ='rating')
+# Calculate mean and count of ratings
+ratings = pd.DataFrame(data.groupby('title')['rating'].mean())
+ratings['num of ratings'] = data.groupby('title')['rating'].count()
 
-moviemat.head()
+# Create pivot table
+moviemat = data.pivot_table(index='user_id', columns='title', values='rating')
 
-print(ratings.sort_values('num of ratings', ascending = False).head(10))
+# GUI Implementation
+def recommend_movies():
+    movie_name = movie_entry.get()
+    output_text.delete(1.0, END)  # Clear previous results
 
-# analysing correlation with similar movies
-starwars_user_ratings = moviemat['Star Wars (1977)']
-liarliar_user_ratings = moviemat['Liar Liar (1997)']
+    if movie_name in moviemat.columns:
+        movie_ratings = moviemat[movie_name]
+        similar_movies = moviemat.corrwith(movie_ratings)
+        corr_movies = pd.DataFrame(similar_movies, columns=['Correlation'])
+        corr_movies.dropna(inplace=True)
+        corr_movies = corr_movies.join(ratings['num of ratings'])
 
-print(starwars_user_ratings.head())
+        recommendations = corr_movies[corr_movies['num of ratings'] > 100].sort_values('Correlation', ascending=False).head()
 
-# analysing correlation with similar movies
-starwars_user_ratings = moviemat['Star Wars (1977)']
-liarliar_user_ratings = moviemat['Liar Liar (1997)']
+        output_text.insert(END, f"Recommendations for '{movie_name}':\n\n")
+        for title, row in recommendations.iterrows():
+            output_text.insert(END, f"{title} (Correlation: {row['Correlation']:.2f}, Ratings: {int(row['num of ratings'])})\n")
+    else:
+        output_text.insert(END, f"'{movie_name}' not found in the dataset. Please try another movie.")
 
-print(starwars_user_ratings.head())
+# Create GUI window
+root = Tk()
+root.title("Movie Recommendation System")
 
-# analysing correlation with similar movies
-similar_to_starwars = moviemat.corrwith(starwars_user_ratings)
-similar_to_liarliar = moviemat.corrwith(liarliar_user_ratings)
+# GUI Components
+Label(root, text="Enter a movie name:").grid(row=0, column=0, padx=10, pady=10)
+movie_entry = Entry(root, width=40)
+movie_entry.grid(row=0, column=1, padx=10, pady=10)
 
-corr_starwars = pd.DataFrame(similar_to_starwars, columns =['Correlation'])
-corr_starwars.dropna(inplace = True)
+recommend_button = Button(root, text="Recommend", command=recommend_movies)
+recommend_button.grid(row=0, column=2, padx=10, pady=10)
 
-print(corr_starwars.head())
+output_text = Text(root, height=15, width=80)
+output_text.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
 
-# Similar movies like starwars
-corr_starwars.sort_values('Correlation', ascending = False).head(10)
-corr_starwars = corr_starwars.join(ratings['num of ratings'])
-
-print(corr_starwars.head())
-
-corr_starwars[corr_starwars['num of ratings']>100].sort_values('Correlation', ascending = False).head()
-
-# Similar movies as of liarliar
-corr_liarliar = pd.DataFrame(similar_to_liarliar, columns =['Correlation'])
-corr_liarliar.dropna(inplace = True)
-
-corr_liarliar = corr_liarliar.join(ratings['num of ratings'])
-print(corr_liarliar[corr_liarliar['num of ratings']>100].sort_values('Correlation', ascending = False).head())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Run the application
+root.mainloop()
